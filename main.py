@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as dpg
-import download_manager as dwm
+from download_manager import *
 
-dm = dwm.DownloadManager(4)
+dm = DownloadManager(4)
 
 def download_all(sender):
     dm.download_all()
@@ -23,18 +23,21 @@ def update_download_list(sender, app_data):
             dpg.add_table_column(width_stretch=False)
             dpg.add_table_column(width_stretch=True)
             dpg.add_table_column(width_stretch=False)
+            dpg.add_table_column(width_stretch=False)
             # Add the updated download list
             index=0
             for download in download_list:
                 index+=1
                 with dpg.table_row():
-                    if download.status == dwn.Status.NOT_STARTED:
-                        dpg.add_button(label="Start",width=100)
-                    elif download.status == dwn.Status.DOWNLOADING:
-                        dpg.add_button(label="Pause",width=100)
-                    dpg.add_text(tag="url-"+str(index),default_value=download.url)
-                    dpg.add_progress_bar(overlay=f"{download.progress}%", width=100)
-                    with dpg.tooltip(parent="url-"+str(index)):
+                    if download.status == Status.NOT_STARTED:
+                        dpg.add_button(label="Start",width=50)
+                    elif download.status == Status.DOWNLOADING:
+                        dpg.add_button(label="Pause",width=50)
+                    dpg.add_text(tag="filename-"+str(index),default_value=download.file_name)
+                    dpg.add_text(tag="size-"+str(index),default_value=download.get_formatted_total_size())
+                    str_progress = '%.1f' % download.get_progress()
+                    dpg.add_progress_bar(overlay=str_progress, width=100, height=20, default_value=float(str_progress))
+                    with dpg.tooltip(parent="filename-"+str(index)):
                         dpg.add_text(download.url)
 
 
@@ -70,6 +73,10 @@ dpg.destroy_context()
 # https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf
 # Google logo
 # https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png
-# Public song
+# Song
 # https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3
+# Public video
+# http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
+# Public document
+# https://sample-videos.com/doc/Sample-doc-file-100kb.doc
 

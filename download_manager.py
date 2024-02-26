@@ -29,3 +29,12 @@ class DownloadManager:
     
     def get_download_list(self):
         return self._download_list
+
+    def is_valid_url(self, url: str):
+        return url.startswith("http")
+    
+    def is_url_repeated(self, url: str):
+        for dw in self._download_list:
+            if dw.url == url:
+                return True
+        return False

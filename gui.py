@@ -74,6 +74,9 @@ class App(ctk.CTk):
         self.main_frame.grid_rowconfigure(2, weight=1)
         self.download_gui_list = []
         self.toplevel_window = None
+        self.dw_list_lock = threading.Lock()
+        self.main_thread_pool = ThreadPoolExecutor(max_workers=16)
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         # Download manager
         self.dm = DownloadManager(3)
 
@@ -83,7 +86,9 @@ class App(ctk.CTk):
         self.url_frame.grid_columnconfigure(0, weight=1)
         self.url_entry = ctk.CTkEntry(self.url_frame, placeholder_text="Enter URL")
         self.url_entry.grid(row=0, column=0, columnspan=4, sticky="ew", padx=(0,5))
-        self.url_add_button = ctk.CTkButton(self.url_frame, text="➕Add",width=30, command=self.add_url_cb)
+        self.url_add_button = ctk.CTkButton(self.url_frame, text="➕Add",width=30)
+        # Bind a lambda method that uses the thread pool to add the URL to the download manager
+        self.url_add_button.configure(command=lambda: self.main_thread_pool.submit(self.add_url_cb))
         self.url_add_button.grid(row=0, column=4)
         # Download buttons widgets
         self.buttons_frame = ctk.CTkFrame(self.main_frame,fg_color="transparent")
@@ -106,15 +111,21 @@ class App(ctk.CTk):
         self.download_list_frame.grid_columnconfigure(1, weight=1)
 
         # Start a thread to update the widgets
-        thread = threading.Thread(target=self.update_widgets)
-        thread.daemon = True
-        thread.start()
+        self.main_thread_pool.submit(self.update_widgets)
+        #thread = threading.Thread(target=self.update_widgets)
+        #thread.start()
         #thread.join()
 
     def download_all_cb(self):
+        """
+        Callback for the start all button
+        """
         self.dm.download_all()
 
     def add_url_cb(self):
+        """
+        Callback for the add URL button
+        """
         url = self.url_entry.get()
         
         if not self.dm.is_valid_url(url):
@@ -128,25 +139,34 @@ class App(ctk.CTk):
             self.show_error_popup("URL already added")
             self.url_entry.delete(0, "end")
             return
-
-        self.dm.add_download(url, "", "")
-        self.url_entry.delete(0, "end")
         # Getting the index of the last download added
+        self.dw_list_lock.acquire()
         index = 0
         if len(self.dm.get_download_list()) > 0:
             index = len(self.dm.get_download_list())
+        self.dm.add_download(url, "", "")
+        self.url_entry.delete(0, "end")
         download_item : DownloadItemGUI = DownloadItemGUI(self.dm.get_download_list()[-1], self.download_list_frame, index)
-        download_item.delete_button.configure(command=lambda: self.delete_download_item(index))
+        download_item.delete_button.configure(command=lambda: self.main_thread_pool.submit(self.delete_download_item, index))
         self.download_gui_list.append(download_item)
-
+        self.dw_list_lock.release()
 
     def update_widgets(self):
+        """
+        Method to update the widgets in the main window
+        This method is called using a different thread
+        """
         while True:
             self.update_download_list()
-            # Sleeps 60 times per second
+            # Sleeps 120 times per second
             time.sleep(1/60)
 
     def update_download_list(self):
+        """
+        Updates the list of downloads in the GUI.
+        This method is called by the update_widgets method (different thread)
+        """
+        self.dw_list_lock.acquire()
         for download_item in self.download_gui_list:
             #download_item.filename_label.config(text=download_item.download.file_name)
             download_item.size_label.configure(text=download_item.download.get_formatted_total_size())
@@ -154,8 +174,14 @@ class App(ctk.CTk):
             download_item.progress_label.configure(text=str_progress+"%")
             download_item.progress_bar.set(float(str_progress)/100.0)
             #download_item.control_button.config(command=download_item.download.toggle)
+        self.dw_list_lock.release()
 
     def show_error_popup(self, error_message:str):
+        """
+        Shows a modal dialog with an error message.
+        The new modal dialog will grab focus and the input widgets will be disabled.
+        This method uses top-level windows mentioned in the customtkinter documentation
+        """
         if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
             self.toplevel_window = ErrorPopup(error_message,self)  # create window if its None or destroyed
         else:
@@ -165,6 +191,7 @@ class App(ctk.CTk):
         """
         Deletes a download item from the GUI and the download list in the download manager
         """
+        self.dw_list_lock.acquire()
         self.download_gui_list[index].control_button.destroy()
         self.download_gui_list[index].filename_label.destroy()
         self.download_gui_list[index].size_label.destroy()
@@ -182,3 +209,12 @@ class App(ctk.CTk):
             self.download_gui_list[i].delete_button.grid(row=i, column=5, sticky="e", padx=5, pady=5)
             self.download_gui_list[i].options_button.grid(row=i, column=6, sticky="e", padx=5, pady=5)
         self.dm.get_download_list().pop(index)
+        self.dw_list_lock.release()
+    def on_closing(self):
+        """
+        Method to be called when the main window is closed
+        """
+        #self.main_thread_pool.shutdown()
+        #self.dm.terminate()
+        self.destroy()
+        print("App closed")

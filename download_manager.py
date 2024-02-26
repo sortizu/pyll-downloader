@@ -38,3 +38,6 @@ class DownloadManager:
             if dw.url == url:
                 return True
         return False
+    def terminate(self):
+        self.executor.shutdown()
+        print("Download manager closed")

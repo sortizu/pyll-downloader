@@ -2,7 +2,7 @@ import gui
 
 app = gui.App()
 app.mainloop()
-
+app.main_thread_pool.shutdown()
 # Different urls to test the program
 # PDF file
 # https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf

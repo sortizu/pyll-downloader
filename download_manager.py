@@ -39,5 +39,5 @@ class DownloadManager:
                 return True
         return False
     def terminate(self):
-        self.executor.shutdown()
+        self.executor.shutdown(wait=False)
         print("Download manager closed")
